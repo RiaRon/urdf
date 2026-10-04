@@ -36,8 +36,8 @@
   <xacro:arg name="right_mount_rpy" default="0 0 -1.5707964"/>
 
   <!-- Optional: upstream Tesollo xacro paths (generated DG5F-S fragments) -->
-  <xacro:arg name="left_tesollo_xacro" default="/home/user/rl_ws/urdf/eef/dg5fs/dg5fs_left.xacro"/>
-  <xacro:arg name="right_tesollo_xacro" default="/home/user/rl_ws/urdf/eef/dg5fs/dg5fs_right.xacro"/>
+  <xacro:arg name="left_tesollo_xacro" default="${xacro.abs_filename('../eef/dg5fs/dg5fs_left.xacro')}"/>
+  <xacro:arg name="right_tesollo_xacro" default="${xacro.abs_filename('../eef/dg5fs/dg5fs_right.xacro')}"/>
 
   <!-- Optional: training palm-center frames -->
   <xacro:arg name="left_palm_ee_xyz" default="0.028 0 0.04"/>

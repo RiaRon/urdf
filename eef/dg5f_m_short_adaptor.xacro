@@ -25,7 +25,7 @@
   <xacro:property name="dg5f_short_adaptor_thickness" value="0.010"/>
   <xacro:property name="dg5f_short_adaptor_mass" value="0.031642"/>
   <xacro:property name="dg5f_short_adaptor_dir"
-                 value="/home/user/rl_ws/urdf/vendor/dg5f_m_short_adaptor/meshes"/>
+                 value="${xacro.abs_filename('../vendor/dg5f_m_short_adaptor/meshes')}" lazy_eval="false"/>
 
   <xacro:macro name="dg5f_m_short_adaptor" params="prefix:=''">
     <link name="${prefix}dg5f_short_adaptor">
