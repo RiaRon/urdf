@@ -150,6 +150,15 @@ def test_dg5f_hand_mass_matches_measurement() -> None:
         assert hand_mass_kg(root, side) == pytest.approx(1.763, abs=1e-3)
 
 
+def test_leap_hand_effort_follows_official_sim() -> None:
+    """LEAP: effort 0.5 from LEAP_Hand_Sim (vendor URDF says 0.95)."""
+    root = load_urdf("openarm_leap_bi")
+    hand_limits = [j.find("limit") for j in root.findall("joint")
+                   if j.attrib["name"].startswith(("r_hj_", "l_hj_")) and j.find("limit") is not None]
+    assert len(hand_limits) == 32
+    assert {float(l.attrib["effort"]) for l in hand_limits} == {0.5}
+
+
 @pytest.mark.parametrize("name", [n for n in RL_NAMES if n not in gen.HAND_MASS_TARGET_KG])
 def test_other_hands_keep_vendor_mass(name: str) -> None:
     root = load_urdf(name)
@@ -158,7 +167,8 @@ def test_other_hands_keep_vendor_mass(name: str) -> None:
     #   여기 값이 갈리면 용접이 링크를 병합했다는 뜻이라 실패해야 맞다.
     vendor = {"openarm_dg5f-m-short_bi": 1.5700, "openarm_dg5f-m-short-tl_bi": 1.5700,
               "openarm_dg5f-s_bi": 1.2084,
-              "openarm_rh56f1_bi": 0.7077, "openarm_gripper_bi": 0.4222}
+              "openarm_rh56f1_bi": 0.7077, "openarm_gripper_bi": 0.4222,
+              "openarm_leap_bi": 0.745}   # dex-urdf: right 0.746, left 0.744
     for side in ("r", "l"):
         assert hand_mass_kg(root, side) == pytest.approx(vendor[name], abs=2e-3)
 

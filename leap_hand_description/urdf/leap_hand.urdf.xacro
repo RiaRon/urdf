@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!-- One LEAP Hand on its own, rooted at its seat frame `mount`. side:=left|right -->
+<robot name="leap_hand" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="side" default="right"/>
+  <xacro:include filename="$(find leap_hand_description)/urdf/leap_hand_macro.xacro"/>
+  <xacro:if value="${'$(arg side)' == 'left'}">
+    <xacro:leap_hand_left/>
+  </xacro:if>
+  <xacro:if value="${'$(arg side)' == 'right'}">
+    <xacro:leap_hand_right/>
+  </xacro:if>
+</robot>

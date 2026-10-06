@@ -217,6 +217,9 @@ SOURCES = OrderedDict(
         ("openarm_dg5f-s_bi", ROOT / "generated" / "source" / "openarm_tesollo_bi_s.urdf"),
         ("openarm_rh56f1_bi", ROOT / "generated" / "source" / "openarm_bi_rh56f1.urdf"),
         ("openarm_gripper_bi", ROOT / "generated" / "source" / "openarm_gripper_bi.urdf"),
+        # LEAP Hand (vendor/leap_hand, dex-urdf copy), both hands; source made by
+        # tools/gen_leap_bi_source.py. ⚠Mount height is the RH56F1 adapter's, temporary.
+        ("openarm_leap_bi", ROOT / "generated" / "source" / "openarm_bi_leap.urdf"),
     ]
 )
 
@@ -240,6 +243,26 @@ RH_FINGERS = {
     "ring": "ring",
     "little": "pinky",
 }
+# LEAP Hand vendor names -> canonical suffixes. The vendor joint names "0".."15" are the
+# LEAP_Hand_API motor indices; within a finger the chain runs MCP flex (1) -> MCP side (0)
+# -> PIP (2) -> DIP (3), so `_1.._4` follow the chain, not the motor index. No pinky.
+LEAP_JOINTS = {
+    "1": "index_1", "0": "index_2", "2": "index_3", "3": "index_4", "index_tip": "index_tip",
+    "5": "middle_1", "4": "middle_2", "6": "middle_3", "7": "middle_4", "middle_tip": "middle_tip",
+    "9": "ring_1", "8": "ring_2", "10": "ring_3", "11": "ring_4", "ring_tip": "ring_tip",
+    "12": "thumb_1", "13": "thumb_2", "14": "thumb_3", "15": "thumb_4", "thumb_tip": "thumb_tip",
+}
+LEAP_LINKS = {
+    "palm_lower": "palm", "palm_lower_left": "palm",
+    "mcp_joint": "index_1", "pip": "index_2", "dip": "index_3", "fingertip": "index_4",
+    "index_tip_head": "index_tip",
+    "mcp_joint_2": "middle_1", "pip_2": "middle_2", "dip_2": "middle_3", "fingertip_2": "middle_4",
+    "middle_tip_head": "middle_tip",
+    "mcp_joint_3": "ring_1", "pip_3": "ring_2", "dip_3": "ring_3", "fingertip_3": "ring_4",
+    "ring_tip_head": "ring_tip",
+    "thumb_temp_base": "thumb_1", "thumb_left_temp_base": "thumb_1", "thumb_pip": "thumb_2",
+    "thumb_dip": "thumb_3", "thumb_fingertip": "thumb_4", "thumb_tip_head": "thumb_tip",
+}
 MOVABLE_TYPES = {"revolute", "continuous", "prismatic"}
 
 
@@ -254,23 +277,26 @@ def add(mapping: dict[str, str], old: str, new: str) -> None:
 
 
 def normalize_mesh_uri(uri: str) -> str:
-    """Convert package:// and legacy absolute mesh references into file:// URIs."""
-    legacy_root_map = {
-        ROOT / "openarm_description": ROOT / "vendor" / "openarm_description",
-        ROOT / "RH56F1": ROOT / "vendor" / "RH56F1",
+    """Convert package:// and legacy absolute mesh references into file:// URIs.
+
+    Legacy sources hard-code the workspace they were written in (e.g.
+    /home/user/rl_ws/urdf/openarm_description/...), so a legacy package is found
+    by its directory name, not by a root prefix - the repo has moved since.
+    """
+    legacy_package_roots = {
+        "openarm_description": ROOT / "vendor" / "openarm_description",
+        "RH56F1": ROOT / "vendor" / "RH56F1",
     }
 
     package_prefix = "package://"
     if not uri.startswith(package_prefix):
         file_prefix = "file://"
         if uri.startswith(file_prefix):
-            path = Path(uri[len(file_prefix) :])
-            for old_root, new_root in legacy_root_map.items():
-                try:
-                    relpath = path.relative_to(old_root)
-                except ValueError:
-                    continue
-                return f"file://{(new_root / relpath).resolve()}"
+            parts = Path(uri[len(file_prefix) :]).parts
+            for package, new_root in legacy_package_roots.items():
+                if package in parts:
+                    relpath = Path(*parts[parts.index(package) + 1 :])
+                    return f"file://{(new_root / relpath).resolve()}"
         return uri
 
     remainder = uri[len(package_prefix) :]
@@ -646,6 +672,26 @@ def build_stock_gripper_maps(link_names: set[str], joint_names: set[str]) -> tup
     return link_map, joint_map
 
 
+def build_leap_maps(link_names: set[str], joint_names: set[str]) -> tuple[dict[str, str], dict[str, str]]:
+    link_map: dict[str, str] = {}
+    joint_map: dict[str, str] = {}
+
+    for side in ("right", "left"):
+        s = side_prefix(side)
+        p = f"leap_{side}_"
+        mount_joint = f"mount_{side}_link7_to_leap"
+        if mount_joint in joint_names:
+            add(joint_map, mount_joint, f"{s}_hj_mount")
+        for old, new in LEAP_LINKS.items():
+            if p + old in link_names:
+                add(link_map, p + old, f"{s}_hl_{new}")
+        for old, new in LEAP_JOINTS.items():
+            if p + old in joint_names:
+                add(joint_map, p + old, f"{s}_hj_{new}")
+
+    return link_map, joint_map
+
+
 def merge_maps(*maps: tuple[dict[str, str], dict[str, str]]) -> tuple[dict[str, str], dict[str, str]]:
     link_map: dict[str, str] = {}
     joint_map: dict[str, str] = {}
@@ -901,11 +947,31 @@ HAND_JOINT_SPEC: dict[str, dict[str, tuple[float, float]] | None] = {
     # 벤더 Isaac USD 를 대조하지 않은 자산 — None 이면 벤더 URDF 값을 그대로 둔다.
     "openarm_rh56f1_bi": None,        # Inspire — Tesollo 자산이 아니다
     "openarm_gripper_bi": None,       # 스톡 2지 그리퍼 — 손이 아니다
+    # LEAP — 한계·velocity 는 벤더 URDF 그대로, effort 만 HAND_EFFORT_OVERRIDE_NM 이 덮는다.
+    "openarm_leap_bi": None,
     "openarm_dg5f-m_bi": _spec_from_deg(_DG5F_M_RANGE_DEG),
     "openarm_dg5f-m-short_bi": _spec_from_deg(_DG5F_M_RANGE_DEG),
     "openarm_dg5f-m-short-tl_bi": _spec_from_deg(_DG5F_M_RANGE_DEG),
     "openarm_dg5f-s_bi": _spec_from_deg(_DG5F_S_RANGE_DEG),
 }
+
+#: 자산 → 손 관절 effort(N·m). 벤더 **sim** 이 URDF 와 다른 값을 쓸 때 그 값을 따른다(§0).
+#:   LEAP: URDF 0.95 를 공식 LEAP_Hand_Sim 이 0.5 로 덮는다
+#:   (leapsim/tasks/leap_hand_rot.py:353 `leap_hand_dof_props['effort'][i] = 0.5`, 사용자 확정 10.06).
+HAND_EFFORT_OVERRIDE_NM: dict[str, float] = {"openarm_leap_bi": 0.5}
+
+
+def apply_hand_effort_override(root: ET.Element, asset: str) -> list[str]:
+    effort = HAND_EFFORT_OVERRIDE_NM.get(asset)
+    if effort is None:
+        return []
+    changed = []
+    for joint in root.findall("joint"):
+        limit = joint.find("limit")
+        if limit is not None and re.fullmatch(r"[rl]_hj_.+", joint.get("name") or ""):
+            changed.append(f"{joint.get('name')} effort {limit.get('effort')}→{effort:g}")
+            limit.set("effort", f"{effort:g}")
+    return changed
 
 
 #: 자산별로 **fixed 로 용접할** 손 관절 정규식. 미등록 자산은 잠그지 않는다.
@@ -1438,6 +1504,7 @@ def generate_one(name: str, source_path: Path) -> tuple[Path, Path]:
         build_stock_gripper_maps(link_names, joint_names),
         build_tesollo_maps(link_names, joint_names),
         build_rh56f1_maps(link_names, joint_names),
+        build_leap_maps(link_names, joint_names),
     )
 
     rename_tree(root, link_map, joint_map, asset_robot_name(name))
@@ -1453,6 +1520,8 @@ def generate_one(name: str, source_path: Path) -> tuple[Path, Path]:
     link_map, joint_map = merge_maps((link_map, joint_map), (head_link_map, head_joint_map))
     for _line in apply_hand_joint_spec(root, name):
         print(f"[{name}] 관절한계 축소 {_line}")
+    for _line in apply_hand_effort_override(root, name):
+        print(f"[{name}] {_line}")
     # ★한계 설정 **뒤**에 용접한다 — 순서가 반대면 apply_hand_joint_spec 이 fixed 관절에
     #   <limit> 을 다시 달아 임포터가 드라이브를 만든다.
     for _j in lock_hand_joints(root, name):

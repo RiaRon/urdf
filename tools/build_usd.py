@@ -230,6 +230,18 @@ GRIPPER_DRIVER_GAINS = FixedGains(
 )
 
 
+# LEAP Hand: the official sim (LEAP_Hand_Sim leapsim/cfg/task/LeapHandRot.yaml
+# `controller: pgain 3 / dgain 0.1`, applied as IsaacGym DOF stiffness/damping in
+# leapsim/tasks/leap_hand_rot.py, position control) - Nm/rad. The real hand's
+# LEAP_Hand_API kP=600 / kD=200 are Dynamixel register units, not portable.
+LEAP_SIM_GAINS = FixedGains(
+    joints=tuple(f"{s}_hj_{finger}_{i}" for s in ("r", "l")
+                 for finger in ("thumb", "index", "middle", "ring") for i in range(1, 5)),
+    stiffness=3.0, damping=0.1,
+    origin="LEAP_Hand_Sim LeapHandRot.yaml controller pgain/dgain",
+)
+
+
 @dataclass(frozen=True)
 class AssetBuild:
     """Per-asset build settings that cannot be derived from the URDF alone.
@@ -293,6 +305,9 @@ ASSET_BUILDS: dict[str, AssetBuild] = {
     # finger_joint1) -> PhysX mimic; only *_hj_gripper_1 is commandable.
     "openarm_gripper_bi_rl": AssetBuild(
         hand_drive="mimic", gain_sources=(ARM_DRIVER_GAINS, GRIPPER_DRIVER_GAINS)),
+    # LEAP Hand: 16 Dynamixel motors per hand, one per joint, no <mimic> tags.
+    "openarm_leap_bi_rl": AssetBuild(
+        hand_drive="direct", gain_sources=(ARM_DRIVER_GAINS, LEAP_SIM_GAINS)),
 }
 
 
