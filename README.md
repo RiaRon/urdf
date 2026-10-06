@@ -254,6 +254,32 @@ That launch file points to:
 /home/user/rl_ws/urdf/assemblies/openarm_modular_dual.xacro
 ```
 
+### Visualize OpenArm with RH56F1 (mock only)
+
+From this repository root, source ROS 2 and launch the canonical integrated
+model without any hardware or controller nodes:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+ros2 launch launch/display_openarm_rh56f1.launch.py \
+  hand_configuration:=both use_gui:=true use_rviz:=true
+```
+
+`hand_configuration` accepts `arm_only`, `left`, `right`, or `both`. Set
+`use_gui:=false` for headless mock joint states and `use_rviz:=false` for a TF
+smoke test. The launch derives all variants from
+`generated/rl/openarm_rh56f1_bi_rl.urdf`; it only resolves local mesh paths and
+removes disabled hand subtrees, so mount transforms and hand kinematics remain
+identical to the canonical asset.
+
+Generate a standalone local-path URDF for inspection with:
+
+```bash
+python3 tools/openarm_rh56f1_visualization.py \
+  --hand-configuration both --output /tmp/openarm_rh56f1_both.urdf
+check_urdf /tmp/openarm_rh56f1_both.urdf
+```
+
 ### Real hardware bringup source path
 
 The real-hardware launch path is:
